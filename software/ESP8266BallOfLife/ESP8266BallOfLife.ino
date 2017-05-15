@@ -15,7 +15,7 @@ const int MPU_addr = 0x68; // I2C address of the MPU-6050
 int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
 
 // Check to see if the thing has moved in the last x seconds
-const unsigned char SETTING_MOVE_COUNT = 10;
+const unsigned char SETTING_MOVE_TIMER = 3;
 const unsigned char SETTING_MOVE_AMOUNT = 10;
 unsigned long moving_last_time;
 uint8_t moving_last_a, moving_last_b, moving_last_c;
@@ -72,7 +72,7 @@ void Reset()
 
 // ToDo: this is not working yet 
 bool GetMoving() {
-  if( millis() - moving_last_time < SETTING_MOVE_COUNT ) {
+  if( millis() - moving_last_time < SETTING_MOVE_TIMER * 1000 ) {
     return true ;
   }
   return false; 
@@ -95,7 +95,8 @@ void UpdateInput()
 
 void DebugPrint()
 {
-    Serial.print("AcX = ");
+    
+    Serial.print(" | AcX = ");
     Serial.print(AcX);
     Serial.print(" | AcY = ");
     Serial.print(AcY);
@@ -115,11 +116,12 @@ void DebugPrint()
 
 void ModeAccelerometer()
 {
+    // Scale the values to a 0-254 value 
+    uint8_t a = (uint8_t)map(AcX, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 254 );
+    uint8_t b = (uint8_t)map(AcY, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 254 );
+    uint8_t c = (uint8_t)map(AcZ, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 254 );
 
-    uint8_t a = (uint8_t)map(AcX, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 255 / 3);
-    uint8_t b = (uint8_t)map(AcY, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 255 / 3);
-    uint8_t c = (uint8_t)map(AcZ, SETTINGS_MIN_ACCEL, SETTINGS_MAX_ACCEL, 0, 255 / 3);
-
+    // Debug print. 
     Serial.print(" | a = ");
     Serial.print(a);
     Serial.print(" | b = ");
@@ -128,6 +130,8 @@ void ModeAccelerometer()
     Serial.print(c);
 
     // Check for movement
+    // If we have sufiiant movment in this frame then update the last movment timer
+    // This timer is used to tell if we have moved the ball in the last three seconds or so. 
     if (abs(moving_last_a - a) > SETTING_MOVE_AMOUNT ) {
         moving_last_time = millis();
     }
@@ -141,22 +145,26 @@ void ModeAccelerometer()
     moving_last_b = b ; 
     moving_last_c = c ; 
 
+    // We have three numbers that need to be used for the hue. Lets take all three
+    // numbers add them together and divide by 3. There will be multiple ways to get 
+    // to get to the same color but thats okay. 
     for (unsigned short ledOffset = 0; ledOffset < SETTINGS_NUM_LEDS; ledOffset++) {
-        leds[ledOffset] = CHSV(a + b + c, 255, 255);
+        leds[ledOffset] = CHSV(a/3 + b/3 + c/3, 255, 255);
     }
     FastLED.show();
 }
 
 void loop()
 {
+    Serial.print( millis() );
+
     UpdateInput();
     DebugPrint();
 
     ModeAccelerometer();
 
+    // Debug print 
     Serial.print(" | Moving = ");
     Serial.print(GetMoving());
-
     Serial.println("");
-    // delay(333);
 }
